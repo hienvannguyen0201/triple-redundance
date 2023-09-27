@@ -6,20 +6,6 @@ def read_file(file_name):
 	with open(file_name, 'r') as file:
 		lines = file.readlines()
 	filtered_lines = [line for line in lines if not line.strip().startswith("//") and not line.strip().startswith("#")]
-	# string = str(filtered_lines)
-	# print(lines)
-		# is_inmodule = False
-		#  duyet qua tung dong
-		# for line in lines :
-		# 	#  lay nhung dong nam trong module
-		# 		if 'module' in line or is_inmodule  :
-		# 				line = line.lstrip()
-		# 				tmp += line
-		# 				is_inmodule = True
-		# 		elif 'endmodule' in line:
-		# 			is_inmodule = False
-		# #  Phan tach bang dau cham phay 
-		# data = tmp.split(';')
 	return filtered_lines
 
 def extract_module(file_name):
@@ -32,7 +18,7 @@ def extract_module(file_name):
 			if "module" in ind:
 				tmp = ind.split("module")[1].split(" (")[0]
 				module.append(tmp)
-				print(tmp)
+				# print(tmp)
 	return module
 	# print()
 
@@ -73,17 +59,35 @@ def add_voter(file_main, file_netlist, file_voter):
 	with open (file_main,'r') as file:
 		content = read_file(file_main)
 	return content
-def insert_voter(name_voter,inp,output):
-	instance = name_voter+" "+inp+"_0"+output
+def insert_voter(name_voter, inp,output):
+	instance = name_voter+" "+name_voter+"_"+str(i)+"( .in_0("+inp+"_0"+"), "+".in_1("+inp+"_1"+"), "+".in_2("+inp+"_2)"+".out("+output+");"
+	return instance
 
 def insert_FGTMR(origin_design, port_top, output_file, top_module):
 	modules = extract_module(origin_design)
 	for module in modules :
 		content = get_port(origin_design, "module "+module)
 		port_ff = extract_port_ff(content)[2]
-		content = content.split("\n\n")[0]
 
+		content = content.split(";")
+		content_0 = content.split("\n\n")[0]
+
+		content_1 = content.split("\n\n")[1]
 		# for ind in port_ff
+		for ind in port_ff:
+			print(ind)
+			tmp=extract_in_out_ff(ind)
+			# print(tmp[1])
+			content_0 = content_0 + "\n"
+
+			for i in range(3):
+
+				content_1 = content_1.replace(tmp[1],tmp[1]+"_0")
+				print(tmp[0])
+			# insert voter
+			tmp1 = insert_voter("dti_voter","tmp[0]","aa")
+			# content_1=content_1.replace("\t"+tmp1,"endmodule")+"\nendmodule"
+		print (content_1)
 	content = read_file
 
 	print("anh hien")
@@ -121,6 +125,7 @@ def insert_CGTMR(origin_design, port_top, output_file, top_module):
 
     # create instances
 	instances = []
+	voters = []
 	tmp=""
 	for k in range(3):
 		for i in range(len(port_top[0])):
@@ -145,10 +150,48 @@ def insert_CGTMR(origin_design, port_top, output_file, top_module):
 	print(content)
 
 	# insert voter at output
+	ind =0
+	for i in range(len(port_top[1])):
+		for out, value in port_top[1][i].items(): 
+			if value > 1:
+				for k in range(value):
+					tmp_name = out+"["+str(k)+"]"
+					tmp=insert_voter("dti_voter",tmp_name,out)
+					ind=ind+1
+					voters.append(tmp)
+			else:
+				tmp=insert_voter("dti_voter",out,out)
+				ind=ind+1
+				voters.append(tmp)
+	print (voters)
 
 
-def insert_FGDTMR():
+def insert_FGDTMR(origin_design, output_file, top_module):
 	print("FGDTMR")
+	modules = extract_module(origin_design)
+	for module in modules :
+		# print(module)
+		content = get_port(origin_design, "module"+module)
+		# print(content)
+		port_ff = extract_port_ff(content)[2]
+		content_0 = content.split("\n\n")[0]
+
+		content_1 = content.split("\n\n")[1]
+		for ind in port_ff:
+			print(ind)
+			tmp=extract_in_out_ff(ind)
+			# print(tmp[1])
+			content_0 = content_0 + "\n" 
+
+			content_1 = content_1.replace(tmp[1],tmp[1]+"_0")
+			print(tmp[0])
+			# insert voter
+			tmp1 = insert_voter("dti_voter","tmp[0]","aa")
+			# content_1=content_1.replace("\t"+tmp1,"endmodule")+"\nendmodule"
+		print (content_1)
+
+
+
 
 # Tach lay cac dau vao dau ra 
 def get_port(file_path, module_name):
@@ -166,17 +209,14 @@ def get_port(file_path, module_name):
       		        module_content = content[module_start:module_end]
       		        return module_content
 def extract_port_ff(module):
-	input_q =[]
-	output_q = []
-	fliflop = []
-	wire = []
+	input_q 	= []
+	output_q 	= []
+	fliflop 	= []
+	wire 		= []
 
 	# lines_data = read_file(file_netlist)
 	lines_data = module.split(";")
 	# print(lines_data[0])
-
-
-
 	for indx in lines_data:
 		if 'input' in indx:
 			# in_put = re.split(r",|;|\s", indx)
@@ -188,8 +228,9 @@ def extract_port_ff(module):
 			dict1=get_size_port(out_put)
 			output_q.append(dict1)
 		if 'dti_12g_ff' in indx:
-			ff = indx.split("\n")[0].split("; ")
-			fliflop.append(dict1)
+			ff = indx.split(";")[0]
+			# print(ff)
+			fliflop.append(ff)
 		if "wire" in indx:
 			w = indx.split("wire ")[1].split(";")[0]
 			dict1=get_size_port(w)
@@ -317,9 +358,10 @@ file_name1 = "rt_qos_controller_netlist.v"
 string = get_port(file_name1, "module rt_dyn_pri_fsm")
 # print(string)
 # print(string)
-split_text = string.split("\n\n")[0]
-print(split_text)
+split_text = string.split("\n\n")[1]
+# print(split_text)
 # port = (extract_port_ff(string))
-print(extract_port_ff(string)[2])
+# print(extract_port_ff(string)[2])
 
 # insert_CGTMR(file_name1,port,file_main,"rt_qos_controller")
+insert_FGDTMR(file_name1,file_main,"rt_qos_controller")
