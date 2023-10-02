@@ -1,4 +1,6 @@
 import re
+import sys
+import argparse
 def read_file(file_name):
 	tmp = ''
 	data = []
@@ -39,6 +41,23 @@ def extract_in_out_ff(instance_ff):
 			out = indx.split("(")[1].split(")")[0]
 	return inp, out
 
+def get_inout(instance):
+	tmp = instance.strip().split(".")
+	inp = []
+	out = ""
+	name = tmp[0].split(" ")[1]
+	for indx in tmp:
+		# print(indx)
+		if"Z(" in indx or "Q(" in indx:
+			# print(indx)
+			out = indx.split("(")[1].split(")")[0]
+		elif "(" in indx:
+			inp_tmp = indx.split("(")[1].split(")")[0]
+			inp.append(inp_tmp)
+	inp=[element for element in inp if element.strip() != ""]
+	return inp,out,name
+
+
 def create_signal (name_conponent):
 	tmp = [name_conponent + '_1',name_conponent + '_2',name_conponent + '_3']
 	Inout = "wire " + tmp[0] +", "+ tmp[1]+", "+tmp[2]+";"
@@ -59,10 +78,14 @@ def add_voter(file_main, file_netlist, file_voter):
 	with open (file_main,'r') as file:
 		content = read_file(file_main)
 	return content
-def insert_voter(name_voter, inp,output):
-	instance = name_voter+" "+name_voter+"_"+str(i)+"( .in_0("+inp+"_0"+"), "+".in_1("+inp+"_1"+"), "+".in_2("+inp+"_2)"+".out("+output+");"
+def insert_voter(name_voter,ind, inp,output):
+	instance = name_voter+" "+name_voter+"_"+str(ind)+"( .in_0("+inp+"_0"+"), "+".in_1("+inp+"_1"+"), "+".in_2("+inp+"_2)"+".out("+output+");"
 	return instance
-
+def check_value_in_list(lst, value):
+    if value in lst:
+        return True
+    else:
+        return False
 def insert_FGTMR(origin_design, port_top, output_file, top_module):
 	modules = extract_module(origin_design)
 	for module in modules :
@@ -85,7 +108,7 @@ def insert_FGTMR(origin_design, port_top, output_file, top_module):
 				content_1 = content_1.replace(tmp[1],tmp[1]+"_0")
 				print(tmp[0])
 			# insert voter
-			tmp1 = insert_voter("dti_voter","tmp[0]","aa")
+			tmp1 = insert_voter("dti_voter",i,"tmp[0]","aa")
 			# content_1=content_1.replace("\t"+tmp1,"endmodule")+"\nendmodule"
 		print (content_1)
 	content = read_file
@@ -165,6 +188,11 @@ def insert_CGTMR(origin_design, port_top, output_file, top_module):
 				voters.append(tmp)
 	print (voters)
 
+def check_value_in_array(value, array):
+    for element in array:
+        if element == value:
+            return True
+    return False
 
 def insert_FGDTMR(origin_design, output_file, top_module):
 	print("FGDTMR")
@@ -174,21 +202,74 @@ def insert_FGDTMR(origin_design, output_file, top_module):
 		content = get_port(origin_design, "module"+module)
 		# print(content)
 		port_ff = extract_port_ff(content)[2]
+		instance_cell = extract_port_ff(content)[4]
 		content_0 = content.split("\n\n")[0]
 
 		content_1 = content.split("\n\n")[1]
-		for ind in port_ff:
-			print(ind)
-			tmp=extract_in_out_ff(ind)
-			# print(tmp[1])
-			content_0 = content_0 + "\n" 
 
-			content_1 = content_1.replace(tmp[1],tmp[1]+"_0")
-			print(tmp[0])
+		inp =extract_port_ff(content)[0]
+		out = extract_port_ff(content)[1]
+		wire = extract_port_ff(content)[3]
+		wire_signal = [] 
+		for indx in range(len(out)):
+			for key,value in out[indx].items():
+				if value > 1:
+					wire_tmp = "  wire "+"["+str(value-1)+":0] " +key+"_1"+", "+key+"_2"+", "+key+"_3"+";"
+				
+				else :
+					wire_tmp = "  wire "+ key+"_1"+", "+key+"_2"+", "+key+"_3"+"; "
+				wire_signal.append(wire_tmp)
+		for indx in range(len(wire)):
+			for key,value in wire[indx].items():
+				if value > 1:
+					wire_tmp = "  wire "+"["+str(value-1)+":0] " +key+"_1"+", "+key+"_2"+", "+key+"_3"+";"
+				
+				else :
+					wire_tmp = "  wire "+ key+"_1"+", "+key+"_2"+", "+key+"_3"+"; "
+				wire_signal.append(wire_tmp)
+		for indx in wire_signal:
+			content_0 = content_0 +"\n" + indx 
+		# print(content_0)
+		print(inp)
+		# print(out)
+		# print(wire)
+
+		# Split content_1 by ";"
+
+		new_content_1 = content_1.split(";")
+		# print(new_content_1)
+		inp_list = extract_port_ff(content_0)[5]
+		print(inp_list)
+		for ind in new_content_1[:-1]:
+			# print(ind)
+			instance = get_inout(ind)
+			for i in range(3):
+				print("anh hien")
+				print(instance[2])
+				tmp = ind.replace(instance[2],instance[2]+"_"+str(i))
+				tmp = tmp.replace(instance[1],instance[1]+"_"+str(i))
+				# print(tmp)
+				for j in range(len(instance[0])):
+					print(instance[0][j])
+					if check_value_in_list(inp_list,instance[0][j]) == False:
+						tmp = tmp.replace(instance[0][j],instance[0][j]+"_"+str(i))
+						print(tmp)
+
+			
+			
+
+		# for ind in port_ff:
+		# 	print(ind)
+		# 	tmp=extract_in_out_ff(ind)
+		# 	# print(tmp[1])
+		# 	content_0 = content_0 + "\n" 
+
+		# 	content_1 = content_1.replace(tmp[1],tmp[1]+"_0")
+		# 	print(tmp[1])
 			# insert voter
-			tmp1 = insert_voter("dti_voter","tmp[0]","aa")
+			# tmp1 = insert_voter("dti_voter","tmp[0]","aa")
 			# content_1=content_1.replace("\t"+tmp1,"endmodule")+"\nendmodule"
-		print (content_1)
+		# print (content_1)
 
 
 
@@ -213,6 +294,8 @@ def extract_port_ff(module):
 	output_q 	= []
 	fliflop 	= []
 	wire 		= []
+	instance 	= []
+	inp_nosize  = []
 
 	# lines_data = read_file(file_netlist)
 	lines_data = module.split(";")
@@ -223,19 +306,23 @@ def extract_port_ff(module):
 			in_put = indx.split("input ")[1].split(";")[0]
 			dict1=get_size_port(in_put)
 			input_q.append(dict1)
-		if 'output' in indx:
+			inp_nosize=inp_nosize+list(dict1.keys())
+		elif 'output' in indx:
 			out_put = indx.split("output ")[1].split(";")[0]
 			dict1=get_size_port(out_put)
 			output_q.append(dict1)
-		if 'dti_12g_ff' in indx:
+		elif 'dti_12g_ff' in indx:
 			ff = indx.split(";")[0]
 			# print(ff)
 			fliflop.append(ff)
-		if "wire" in indx:
-			w = indx.split("wire ")[1].split(";")[0]
+		elif 'dti' in indx:
+			ins = indx.split(";")[0]
+			instance.append(ins)
+		elif "wire" in indx:
+			w = indx.split("wire ")[1].strip().split(";")[0]
 			dict1=get_size_port(w)
 			wire.append(dict1)
-	return input_q,output_q,fliflop,wire
+	return input_q,output_q,fliflop,wire,instance,inp_nosize
 
 def extract_intance(data):
 	data_1 = []
@@ -297,7 +384,7 @@ def get_size_port(signal_name):
 	value = 1
 	dict1 = {}
 	
-	if "]" in signal_name:
+	if ":" in signal_name:
 		size = signal_name.split("] ")[0].split("[")[1].split(":")[0]
 		value = int(size) +1
 		tmp_name = signal_name.split("] ")[1]
@@ -330,7 +417,7 @@ def extract (data_q, output):
 				final_data.append(string)
 	return final_data
 
-print("anh hien")
+# print("anh hien")
 # if _name_ == '__main__':
 
 file_name ='test.v'
@@ -365,3 +452,32 @@ split_text = string.split("\n\n")[1]
 
 # insert_CGTMR(file_name1,port,file_main,"rt_qos_controller")
 insert_FGDTMR(file_name1,file_main,"rt_qos_controller")
+
+def main():
+
+	parser = argparse.ArgumentParser(description='Generate TMR.')
+
+	# Thêm các tùy chọn
+
+	parser.add_argument('--fi', help='File netlist in')
+
+	parser.add_argument('--fo', help='File netlist out')
+
+	parser.add_argument('--fv', help='File netlist voter')
+   
+	parser.add_argument('--lv', help='Level')
+
+    # Phân tích các đối số dòng lệnh
+	args = parser.parse_args()
+
+    # Truy cập vào các tùy chọn
+	if args.fi and args.fo and args.fv and args.lv:
+		print('Tùy chọn 1 được kích hoạt:', args.option1)
+	elif not args.fi:
+		print(' File netlist in not find')
+	elif not args.fi:
+		print(' File netlist out not find')
+	elif not args.fi:
+		print(' File netlist voter not find')	
+	elif not args.fi:
+		print(' Level not find')
